@@ -1,0 +1,39 @@
+@host = http://localhost:8084
+@customer = rafa
+@orderId = REEMPLAZAR_CON_ID
+@key = prueba-orden-001
+
+### Salud
+GET {{host}}/health
+
+### P1 - Crear orden válida (repetir con la misma key demuestra P4)
+POST {{host}}/api/orders
+Content-Type: application/json
+Idempotency-Key: {{key}}
+
+{
+  "customerId": "{{customer}}",
+  "basketId": "{{customer}}"
+}
+
+### P2 - Consultar orden
+GET {{host}}/api/orders/{{orderId}}
+
+### Órdenes del cliente
+GET {{host}}/api/orders/customer/{{customer}}
+
+### P5 - Pending -> Confirmed
+PATCH {{host}}/api/orders/{{orderId}}/status
+Content-Type: application/json
+
+{
+  "status": "Confirmed"
+}
+
+### P6 - Transición inválida (repetir Confirmed o intentar después de Cancelled)
+PATCH {{host}}/api/orders/{{orderId}}/status
+Content-Type: application/json
+
+{
+  "status": "Cancelled"
+}

@@ -1,0 +1,26 @@
+services:
+  - type: web
+    name: eshop-order-service
+    runtime: docker
+    plan: free
+    dockerfilePath: ./Dockerfile
+    healthCheckPath: /health
+    envVars:
+      - key: MongoDB__ConnectionString
+        sync: false
+      - key: MongoDB__DatabaseName
+        value: eshop-orders
+      - key: MongoDB__CollectionName
+        value: orders
+      - key: Services__BasketUrl
+        value: https://eshop-servicess.onrender.com/
+      - key: Services__CatalogUrl
+        value: https://catalogapi-4t24.onrender.com/
+      - key: Cors__AllowedOrigins__0
+        value: http://localhost:5173
+      - key: Cors__AllowedOrigins__1
+        sync: false
+      - key: ASPNETCORE_URLS
+        value: http://0.0.0.0:8084
+      - key: PORT
+        value: 8084
