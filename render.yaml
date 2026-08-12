@@ -21,6 +21,6 @@ services:
       - key: Cors__AllowedOrigins__1
         sync: false
       - key: ASPNETCORE_URLS
-        value: http://0.0.0.0:8084
+        value: http://0.0.0.0:10000
       - key: PORT
-        value: 8084
+        value: 10000
