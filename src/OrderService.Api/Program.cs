@@ -47,6 +47,7 @@ app.UseExceptionHandler(handler => handler.Run(async context =>
 app.UseCors();
 app.UseSwagger();
 app.UseSwaggerUI();
+app.MapGet("/live", () => Results.Ok(new { status = "Healthy", service = "OrderService" }));
 app.MapGet("/health", async (IOrderRepository repository, CancellationToken cancellationToken) =>
 {
     await repository.CheckHealthAsync(cancellationToken);
