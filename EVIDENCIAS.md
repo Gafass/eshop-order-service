@@ -1,6 +1,8 @@
-# Evidencias de pruebas P1-P9
+# Evidencias de pruebas P1-P10 y publicación final
 
 Fecha de ejecución: 12 de agosto de 2026. Entorno: OrderService local, MongoDB Atlas y servicios Basket/Catálogo de Render.
+
+Publicación final verificada: 13 de agosto de 2026.
 
 ## Resultado
 
@@ -53,6 +55,32 @@ Orden creada
 - Orden real creada para `Jhony Bravo` con `BasketId: Jhony Bravo`.
 - Estado `Pending`, 2 productos, subtotal 6999, IVA 1119.84 y total 8118.84.
 - PDF generado por Minimal API con folio, cliente, Basket, productos y totales.
+
+### Validación pública final en Render y Netlify
+
+- OrderService público: `https://eshop-order-service-m5zx.onrender.com`.
+- Frontend público: `https://jocular-pixie-1487bc.netlify.app`.
+- Deploy de Render `dep-d9unf5vavr4c73b0sii0`: `Deploy succeeded | Live` para el commit
+  `75bfdd725439ec8c5237b318cf4d204e2852c14e`.
+- `GET /health`: `200 OK`, `status: Healthy`, `service: OrderService` y
+  `mongodb: Connected`.
+- Swagger público: `GET /swagger/index.html` devolvió `200 OK`.
+- Flujo público React/proxies -> Basket -> OrderService -> MongoDB Atlas confirmado con la orden
+  `0305249956834524b485915f31520403`.
+- `CustomerId` y `BasketId`: `Evidencia Produccion 20260813 0830`.
+- Estado `Pending`, 2 productos distintos y 3 unidades totales; subtotal 9498, IVA 1519.68 y
+  total 11017.68.
+- Creación: `201 Created`. Reintento con la misma `Idempotency-Key`: `200 OK`, mismo folio y sin
+  duplicar la orden.
+- `GET /api/orders/{id}` y `GET /api/orders/customer/{customerId}`: `200 OK`; ambos confirman el
+  `BasketId` persistido. Esta lectura posterior desde el repositorio MongoDB confirma la evidencia
+  en Atlas sin modificar su configuración.
+- `GET /api/orders/{id}/pdf`: `200 OK`, `Content-Type: application/pdf`, firma `%PDF-` y 41122
+  bytes. El documento público fue generado desde la orden persistida e incluye su `BasketId`.
+- El carrito temporal de la prueba se eliminó después del éxito; la orden se conservó en Atlas
+  como evidencia.
+- El primer acceso al Catálogo devolvió un `504` durante su arranque en frío; el reintento público
+  respondió `200 OK` y entregó los productos usados. Basket respondió saludable.
 
 ## Comprobaciones adicionales
 
