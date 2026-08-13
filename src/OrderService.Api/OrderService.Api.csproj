@@ -8,6 +8,7 @@
 
   <ItemGroup>
     <PackageReference Include="MongoDB.Driver" Version="3.11.0" />
+    <PackageReference Include="QuestPDF" Version="2026.7.3" />
     <PackageReference Include="Swashbuckle.AspNetCore" Version="10.2.3" />
   </ItemGroup>
 

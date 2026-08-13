@@ -30,5 +30,10 @@ public interface ICatalogClient
     Task<IReadOnlyDictionary<string, CatalogProduct>> GetProductsAsync(CancellationToken cancellationToken);
 }
 
+public interface IOrderPdfGenerator
+{
+    byte[] Generate(Order order);
+}
+
 public sealed class BusinessRuleException(string message) : Exception(message);
 public sealed class ResourceNotFoundException(string message) : Exception(message);

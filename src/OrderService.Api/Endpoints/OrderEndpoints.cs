@@ -28,6 +28,20 @@ public static class OrderEndpoints
             .Produces(StatusCodes.Status200OK).ProducesProblem(StatusCodes.Status404NotFound)
             .WithName("GetOrder");
 
+        group.MapGet("/{id}/pdf", async (string id, HttpResponse response,
+            OrderApplicationService service, CancellationToken ct) =>
+        {
+            var pdf = await service.GetPdfAsync(id, ct);
+            response.Headers.ContentDisposition = $"inline; filename=\"orden-{id}.pdf\"";
+            return Results.File(pdf, "application/pdf");
+        })
+        .Produces(StatusCodes.Status200OK, contentType: "application/pdf")
+        .ProducesProblem(StatusCodes.Status400BadRequest)
+        .ProducesProblem(StatusCodes.Status404NotFound)
+        .ProducesProblem(StatusCodes.Status500InternalServerError)
+        .WithName("GetOrderPdf")
+        .WithSummary("Genera el reporte PDF de una orden persistida");
+
         group.MapGet("/customer/{customerId}", async (string customerId, OrderApplicationService service, CancellationToken ct) =>
             Results.Ok(await service.GetByCustomerAsync(customerId, ct)))
             .Produces(StatusCodes.Status200OK).WithName("GetCustomerOrders");

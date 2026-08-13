@@ -1,4 +1,4 @@
-# Evidencias de pruebas P1-P8
+# Evidencias de pruebas P1-P9
 
 Fecha de ejecución: 12 de agosto de 2026. Entorno: OrderService local, MongoDB Atlas y servicios Basket/Catálogo de Render.
 
@@ -14,6 +14,45 @@ Fecha de ejecución: 12 de agosto de 2026. Entorno: OrderService local, MongoDB 
 | P6 Transición inválida | PASS | `Confirmed -> Cancelled` y `Cancelled -> Confirmed` devolvieron `400 Bad Request`. |
 | P7 MongoDB no disponible | PASS | Proceso aislado en 8085 devolvió `503`: `MongoDB no respondió dentro del tiempo esperado.` Sin stack trace ni credenciales. |
 | P8 Flujo React | PASS | Botón `Realizar compra`, confirmación visible y orden `fa2bd36847a44ae1b67bf0c3d112d126` con estado `Pending` y total 4638.84. Basket eliminado después del éxito. |
+
+## Evidencia P9 - Reporte PDF
+
+Estado: PASS.
+
+```text
+Orden creada
+  -> GET /api/orders/{id}/pdf
+  -> 200 OK
+  -> Content-Type: application/pdf
+  -> Content-Disposition: inline
+  -> PDF visible con folio, cliente, fecha, estado, items y totales
+```
+
+- `Generate_supports_multiple_items` genera filas para Teclado, Mouse y Monitor.
+- Las pruebas generan documentos para los `CustomerId` reales `rafa` y
+  `codex-render-smoke-20260812`, sin nombres hardcodeados en el generador.
+- Una orden inexistente produce `ResourceNotFoundException`, traducida por el middleware actual a
+  `404 Not Found`.
+- El documento se genera como `byte[]` en memoria y comienza con la firma válida `%PDF-`.
+- El endpoint usa el snapshot persistido y no consulta nuevamente Basket ni Catálogo.
+
+## Evidencia P10 - Trazabilidad BasketId
+
+- Basket identifica el carrito con `userName`; OrderService consulta `GET basket/{basketId}`.
+- Las órdenes nuevas guardan esa clave real como `BasketId`, con fallback compatible a
+  `CustomerId` cuando el request anterior no lo envía.
+- `GET /api/orders/{id}` y `GET /api/orders/customer/{customerId}` exponen `BasketId`.
+- Idempotencia conserva el mismo `BasketId` y no crea una segunda orden.
+- Las transiciones `Pending -> Confirmed` y `Pending -> Cancelled` siguen funcionando; las
+  transiciones posteriores continúan rechazadas.
+- Una prueba BSON deserializa una orden histórica sin `BasketId` y genera su PDF sin errores.
+- Suite final: 18 pruebas aprobadas.
+
+### Validación local final
+
+- Orden real creada para `Jhony Bravo` con `BasketId: Jhony Bravo`.
+- Estado `Pending`, 2 productos, subtotal 6999, IVA 1119.84 y total 8118.84.
+- PDF generado por Minimal API con folio, cliente, Basket, productos y totales.
 
 ## Comprobaciones adicionales
 

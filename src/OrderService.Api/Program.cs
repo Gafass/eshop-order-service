@@ -12,6 +12,7 @@ builder.Services.ConfigureHttpJsonOptions(options =>
     options.SerializerOptions.Converters.Add(new JsonStringEnumConverter()));
 builder.Services.Configure<MongoOptions>(builder.Configuration.GetSection(MongoOptions.SectionName));
 builder.Services.AddSingleton<IOrderRepository, MongoOrderRepository>();
+builder.Services.AddSingleton<IOrderPdfGenerator, OrderPdfGenerator>();
 builder.Services.AddScoped<OrderApplicationService>();
 builder.Services.AddSingleton(TimeProvider.System);
 builder.Services.AddHttpClient<IBasketClient, BasketClient>(client =>
@@ -24,6 +25,7 @@ builder.Services.AddCors(options => options.AddDefaultPolicy(policy =>
     policy.WithOrigins(origins).AllowAnyHeader().AllowAnyMethod()));
 
 var app = builder.Build();
+QuestPDF.Settings.License = QuestPDF.Infrastructure.LicenseType.Community;
 app.UseExceptionHandler(handler => handler.Run(async context =>
 {
     var exception = context.Features.Get<Microsoft.AspNetCore.Diagnostics.IExceptionHandlerFeature>()?.Error;

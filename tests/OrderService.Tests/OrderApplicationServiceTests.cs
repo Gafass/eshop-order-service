@@ -1,5 +1,6 @@
 using OrderService.Api.Application;
 using OrderService.Api.Domain;
+using OrderService.Api.Infrastructure;
 using Microsoft.Extensions.Logging.Abstractions;
 
 namespace OrderService.Tests;
@@ -19,6 +20,21 @@ public sealed class OrderApplicationServiceTests
         Assert.Equal(32m, order.Tax);
         Assert.Equal(232m, order.Total);
         Assert.Equal(OrderStatus.Pending, order.Status);
+        Assert.Equal("rafa", order.BasketId);
+    }
+
+    [Fact]
+    public async Task Create_persists_explicit_basket_key()
+    {
+        var repository = new FakeRepository();
+        var basketClient = new FakeBasketClient(new ShoppingCart("rafa", [new BasketItem(1, 100m, "p1", "Teclado")]));
+        var service = CreateService(repository, basketClient);
+
+        var (order, _) = await service.CreateAsync(new("rafa", "  rafa  "), "basket-key", default);
+
+        Assert.Equal("rafa", basketClient.RequestedBasketId);
+        Assert.Equal("rafa", order.BasketId);
+        Assert.Equal("rafa", repository.Orders.Single().BasketId);
     }
 
     [Fact]
@@ -33,6 +49,7 @@ public sealed class OrderApplicationServiceTests
         Assert.True(first.Created);
         Assert.False(second.Created);
         Assert.Equal(first.Order.Id, second.Order.Id);
+        Assert.Equal(first.Order.BasketId, second.Order.BasketId);
         Assert.Single(repository.Orders);
     }
 
@@ -56,14 +73,37 @@ public sealed class OrderApplicationServiceTests
             service.ChangeStatusAsync(created.Order.Id, new("Confirmed"), default));
     }
 
+    [Theory]
+    [InlineData("Confirmed")]
+    [InlineData("Cancelled")]
+    public async Task Pending_order_accepts_valid_final_status(string status)
+    {
+        var repository = new FakeRepository();
+        var service = CreateService(repository, [new BasketItem(1, 100m, "p1", "Teclado")]);
+        var created = await service.CreateAsync(new("rafa", "rafa"), $"key-{status}", default);
+
+        var updated = await service.ChangeStatusAsync(created.Order.Id, new(status), default);
+
+        Assert.Equal(status, updated.Status.ToString());
+        Assert.Equal("rafa", updated.BasketId);
+    }
+
     private static OrderApplicationService CreateService(FakeRepository repository, List<BasketItem> items) =>
-        new(repository, new FakeBasketClient(new ShoppingCart("rafa", items)),
-            new FakeCatalogClient(new CatalogProduct("p1", "Teclado", 100m)), TimeProvider.System,
+        CreateService(repository, new FakeBasketClient(new ShoppingCart("rafa", items)));
+
+    private static OrderApplicationService CreateService(FakeRepository repository, FakeBasketClient basketClient) =>
+        new(repository, basketClient,
+            new FakeCatalogClient(new CatalogProduct("p1", "Teclado", 100m)), new OrderPdfGenerator(), TimeProvider.System,
             NullLogger<OrderApplicationService>.Instance);
 
     private sealed class FakeBasketClient(ShoppingCart cart) : IBasketClient
     {
-        public Task<ShoppingCart?> GetAsync(string basketId, CancellationToken cancellationToken) => Task.FromResult<ShoppingCart?>(cart);
+        public string? RequestedBasketId { get; private set; }
+        public Task<ShoppingCart?> GetAsync(string basketId, CancellationToken cancellationToken)
+        {
+            RequestedBasketId = basketId;
+            return Task.FromResult<ShoppingCart?>(cart);
+        }
     }
 
     private sealed class FakeCatalogClient(params CatalogProduct[] products) : ICatalogClient

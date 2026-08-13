@@ -16,8 +16,14 @@ Idempotency-Key: {{key}}
   "basketId": "{{customer}}"
 }
 
+# Basket usa userName como clave real; basketId coincide con el identificador del carrito.
+
 ### P2 - Consultar orden
 GET {{host}}/api/orders/{{orderId}}
+
+### P9 - Generar PDF de la orden
+GET {{host}}/api/orders/{{orderId}}/pdf
+Accept: application/pdf
 
 ### Órdenes del cliente
 GET {{host}}/api/orders/customer/{{customer}}

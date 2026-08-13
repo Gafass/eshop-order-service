@@ -16,12 +16,17 @@ Minimal API en ASP.NET Core 10 que genera órdenes desde el Basket existente, va
 |---|---|---|
 | POST | `/api/orders` | Crea una orden; requiere `Idempotency-Key`. |
 | GET | `/api/orders/{id}` | Recupera una orden. |
+| GET | `/api/orders/{id}/pdf` | Genera el reporte PDF de una orden persistida. |
 | GET | `/api/orders/customer/{customerId}` | Lista órdenes por cliente. |
 | PATCH | `/api/orders/{id}/status` | Acepta `Confirmed` o `Cancelled` desde `Pending`. |
 | GET | `/health` | Salud del servicio. |
 | GET | `/swagger` | Swagger UI. |
 
-`POST /api/orders` acepta `{ "customerId": "rafa", "basketId": "rafa" }`. Si se omite `basketId`, se utiliza `customerId`. El IVA es 16 %. Los precios se validan contra Catálogo y se congelan en la orden.
+`POST /api/orders` acepta `{ "customerId": "rafa", "basketId": "rafa" }`. Basket identifica cada
+carrito mediante `userName`, que también es la clave usada por `GET basket/{basketId}`. Por eso
+`BasketId` almacena exactamente esa clave real del carrito; no se genera un GUID ficticio. Si se
+omite `basketId`, se utiliza `customerId` para conservar compatibilidad con clientes anteriores.
+El IVA es 16 %. Los precios se validan contra Catálogo y se congelan en la orden.
 
 ## MongoDB Atlas
 
@@ -31,6 +36,10 @@ Minimal API en ASP.NET Core 10 que genera órdenes desde el Basket existente, va
 4. No confirmar `.env`, connection strings ni contraseñas en Git.
 
 El servicio crea la colección `orders` y dos índices: uno único para `IdempotencyKey` y otro para consultas por cliente/fecha.
+
+Las órdenes nuevas persisten `BasketId`. La propiedad es nullable para que MongoDB pueda
+deserializar sin errores los documentos históricos creados antes de este ajuste; no se requiere
+una migración ni se modifican órdenes existentes.
 
 ## Ejecución local
 
@@ -77,7 +86,8 @@ dotnet test OrderService.slnx
 ## Publicación en Render
 
 1. Crear un **Web Service** desde el repositorio y seleccionar Docker.
-2. Configurar el Dockerfile raíz y puerto `8084`.
+2. Configurar el Dockerfile raíz. Localhost usa `8084`; el contenedor escucha en `10000`, que es
+   el puerto interno requerido y validado por el servicio existente de Render.
 3. Agregar las variables de `.env.example`, incluyendo la cadena privada de Atlas.
 4. Configurar `Cors__AllowedOrigins__1` con la URL real de Netlify.
 5. Verificar `/health` y `/swagger`.
@@ -99,3 +109,35 @@ Volver a ejecutar `npm run build` y desplegar `dist` en Netlify.
 Una clave repetida devuelve la orden existente con `200 OK`; una nueva devuelve `201 Created`. El índice único evita duplicados incluso ante concurrencia. Las reglas de negocio responden `400`, recursos ausentes `404`, dependencias HTTP no disponibles `503` y errores inesperados `500`, sin exponer secretos ni stack traces.
 
 Los estados se serializan como texto (`Pending`, `Confirmed`, `Cancelled`) tanto en Swagger como en las respuestas JSON. Consulta `EVIDENCIAS.md` para los resultados P1-P8 ejecutados contra Atlas.
+
+## Generación de reportes PDF
+
+El PDF se genera completamente en el backend mediante el endpoint Minimal API
+`GET /api/orders/{id}/pdf`. React envía únicamente el folio; `OrderService` recupera desde
+MongoDB la orden persistida y utiliza su snapshot histórico de productos, cantidades, precios,
+subtotal, IVA, total, cliente, fecha y estado. No vuelve a consultar Basket ni Catálogo.
+Cuando `BasketId` está disponible también aparece de forma discreta en el encabezado; en órdenes
+históricas se omite automáticamente.
+
+`OrderPdfGenerator` utiliza QuestPDF Community y produce el documento directamente en memoria
+como `byte[]`; no se guarda en MongoDB, GridFS ni en el filesystem efímero de Render. La respuesta
+es `200 OK`, `Content-Type: application/pdf` y `Content-Disposition: inline`, por lo que el usuario
+puede verlo e imprimirlo desde el navegador. El mismo flujo funciona para cualquier `CustomerId`
+y para cualquier cantidad de productos.
+
+Ejemplo de prueba, usando un folio real obtenido previamente con `POST /api/orders`:
+
+```powershell
+$orderId = "PEGA_AQUI_EL_FOLIO_REAL"
+Invoke-WebRequest `
+  -Uri "http://localhost:8084/api/orders/$orderId/pdf" `
+  -OutFile ".\orden-$orderId.pdf"
+```
+
+Procedimiento para varios usuarios:
+
+1. Crear una compra para `rafa` y copiar el folio devuelto.
+2. Abrir `GET /api/orders/{folio}/pdf` y confirmar cliente, productos y totales.
+3. Cambiar el nombre de cuenta en React a otro `CustomerId` real y guardar su carrito.
+4. Crear la segunda compra, generar su PDF y confirmar que muestra ese cliente y su propia orden.
+5. También puede usarse el botón **Ver / Imprimir PDF** de la confirmación de compra.

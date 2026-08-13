@@ -9,6 +9,7 @@ public sealed class Order
     [BsonId]
     public string Id { get; init; } = Guid.NewGuid().ToString("N");
     public required string CustomerId { get; init; }
+    public string? BasketId { get; init; }
     public DateTime CreatedAt { get; init; } = DateTime.UtcNow;
     [BsonRepresentation(MongoDB.Bson.BsonType.String)]
     public OrderStatus Status { get; set; } = OrderStatus.Pending;

@@ -6,6 +6,7 @@ public sealed class OrderApplicationService(
     IOrderRepository repository,
     IBasketClient basketClient,
     ICatalogClient catalogClient,
+    IOrderPdfGenerator pdfGenerator,
     TimeProvider timeProvider,
     ILogger<OrderApplicationService> logger)
 {
@@ -29,16 +30,17 @@ public sealed class OrderApplicationService(
             return (existing, false);
         }
 
-        var basketId = string.IsNullOrWhiteSpace(request.BasketId) ? request.CustomerId : request.BasketId;
+        var customerId = request.CustomerId.Trim();
+        var basketId = (string.IsNullOrWhiteSpace(request.BasketId) ? customerId : request.BasketId).Trim();
         logger.LogInformation("Retrieving basket {BasketId}", basketId);
-        var basket = await basketClient.GetAsync(basketId!, cancellationToken);
+        var basket = await basketClient.GetAsync(basketId, cancellationToken);
         if (basket is null || basket.Items.Count == 0)
         {
             logger.LogWarning("Empty or missing basket {BasketId}", basketId);
             throw new BusinessRuleException("El Basket está vacío o no existe.");
         }
         logger.LogInformation("Basket {BasketId} retrieved with {ItemCount} items", basketId, basket.Items.Count);
-        if (!string.Equals(basket.UserName, request.CustomerId, StringComparison.OrdinalIgnoreCase))
+        if (!string.Equals(basket.UserName, customerId, StringComparison.OrdinalIgnoreCase))
             throw new BusinessRuleException("El Basket no pertenece al cliente indicado.");
 
         logger.LogInformation("Calling catalog and validating basket items");
@@ -61,7 +63,8 @@ public sealed class OrderApplicationService(
         var tax = decimal.Round(subtotal * TaxRate, 2, MidpointRounding.AwayFromZero);
         var order = new Order
         {
-            CustomerId = request.CustomerId.Trim(),
+            CustomerId = customerId,
+            BasketId = basketId,
             CreatedAt = timeProvider.GetUtcNow().UtcDateTime,
             Items = items,
             Subtotal = subtotal,
@@ -78,6 +81,27 @@ public sealed class OrderApplicationService(
     public async Task<Order> GetAsync(string id, CancellationToken cancellationToken) =>
         await repository.GetByIdAsync(id, cancellationToken)
         ?? throw new ResourceNotFoundException("Orden no encontrada.");
+
+    public async Task<byte[]> GetPdfAsync(string id, CancellationToken cancellationToken)
+    {
+        if (string.IsNullOrWhiteSpace(id) || !Guid.TryParseExact(id, "N", out _))
+            throw new BusinessRuleException("El folio de la orden no es válido.");
+
+        logger.LogInformation("Generating PDF for Order {OrderId}", id);
+        var order = await GetAsync(id, cancellationToken);
+
+        try
+        {
+            var pdf = pdfGenerator.Generate(order);
+            logger.LogInformation("PDF generated for Order {OrderId}", id);
+            return pdf;
+        }
+        catch (Exception exception)
+        {
+            logger.LogError(exception, "Unable to generate PDF for Order {OrderId}", id);
+            throw;
+        }
+    }
 
     public Task<IReadOnlyList<Order>> GetByCustomerAsync(string customerId, CancellationToken cancellationToken)
     {
